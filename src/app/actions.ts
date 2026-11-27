@@ -29,6 +29,7 @@ export async function updateReportAction(reportId: string, patch: reports.Report
 export async function deleteReportAction(reportId: string) {
   const user = await requireUser();
   await reports.deleteReport(user.id, reportId);
+  revalidatePath("/dashboard");
   redirect("/dashboard");
 }
 

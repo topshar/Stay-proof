@@ -188,7 +188,12 @@ export async function updateReport(userId: string, reportId: string, patch: Repo
 
 export async function deleteReport(userId: string, reportId: string) {
   const sql = await db();
+  const photos = await sql<{ storage: string; storage_key: string }[]>`
+    select p.storage, p.storage_key from photos p join reports r on r.id = p.report_id
+    where r.id = ${reportId} and r.user_id = ${userId}`;
   await sql`delete from reports where id = ${reportId} and user_id = ${userId}`;
+  const { removePhotoObject } = await import("./storage");
+  await Promise.all(photos.map((p) => removePhotoObject(p)));
 }
 
 export async function addRoom(userId: string, reportId: string, room: NewRoom): Promise<boolean> {

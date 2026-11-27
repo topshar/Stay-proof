@@ -4,6 +4,7 @@ import { listReports } from "@/lib/reports";
 import { appOrigin } from "@/lib/origin";
 import { logoutAction } from "@/app/actions";
 import CopyField from "@/components/CopyField";
+import DeleteReportButton from "@/components/DeleteReportButton";
 
 const STATUS: Record<string, [string, string]> = {
   draft: ["Draft", "bg-stone-100 text-stone-700"],
@@ -53,6 +54,9 @@ export default async function Dashboard() {
                       {r.item_count} items
                     </p>
                   </Link>
+                  <div className="mt-1 text-right">
+                    <DeleteReportButton reportId={r.id} label="Delete" />
+                  </div>
                 </li>
               ))}
             </ul>

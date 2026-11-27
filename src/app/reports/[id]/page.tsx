@@ -8,6 +8,7 @@ import ReportEditor from "@/components/ReportEditor";
 import ReportView, { SignatureBlock } from "@/components/ReportView";
 import CopyField from "@/components/CopyField";
 import PrintButton from "@/components/PrintButton";
+import DeleteReportButton from "@/components/DeleteReportButton";
 
 export default async function ReportPage({ params }: PageProps<"/reports/[id]">) {
   const { id } = await params;
@@ -66,6 +67,9 @@ export default async function ReportPage({ params }: PageProps<"/reports/[id]">)
         <ReportView report={report} />
       </div>
       <SignatureBlock report={report} />
+      <div className="mt-6 text-right">
+        <DeleteReportButton reportId={report.id} />
+      </div>
     </div>
   );
 }

@@ -6,7 +6,6 @@ import {
   addItemAction,
   addRoomAction,
   deleteItemAction,
-  deleteReportAction,
   deleteRoomAction,
   renameRoomAction,
   updateItemAction,
@@ -14,6 +13,7 @@ import {
 } from "@/app/actions";
 import { conditionClass } from "./ConditionBadge";
 import PhotoUploader from "./PhotoUploader";
+import DeleteReportButton from "./DeleteReportButton";
 import LandlordSignPanel from "./LandlordSignPanel";
 
 const CONDITIONS = ["excellent", "good", "fair", "poor", "damaged"] as const;
@@ -188,13 +188,7 @@ export default function ReportEditor({ report }: { report: Report }) {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button type="button" className="btn-ghost" onClick={() => run(() => addRoomAction(id, ""))}>+ Add room</button>
-        <button
-          type="button"
-          className="text-sm text-stone-500 hover:text-red-600"
-          onClick={() => confirm("Delete this whole report? This cannot be undone.") && run(() => deleteReportAction(id))}
-        >
-          Delete report
-        </button>
+        <DeleteReportButton reportId={id} />
       </div>
 
       <LandlordSignPanel reportId={id} defaultName={report.landlord_name} />
