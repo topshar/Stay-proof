@@ -1,69 +1,49 @@
-import Image from "next/image";
+import Link from "next/link";
+
+const steps = [
+  {
+    title: "Show Claude the property",
+    body: "Drop your move-in photos into your own Claude and say \"make a condition report for 12 Park St\". Claude reads every photo.",
+  },
+  {
+    title: "Review it in DepositGuard",
+    body: "The room-by-room report lands here. Fix a rating, add a note, then send one link to your tenant.",
+  },
+  {
+    title: "Both sign. Compare at move-out.",
+    body: "Landlord and tenant sign the same record. At move-out, see every item side by side and settle the deposit on facts.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="mx-auto max-w-5xl px-4 py-16">
+      <p className="text-sm font-medium text-brand">For landlords, property managers and tenants</p>
+      <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
+        End deposit fights with a condition report both sides signed.
+      </h1>
+      <p className="mt-5 max-w-2xl text-lg text-stone-600">
+        Your Claude turns move-in photos into a detailed, room-by-room report in a minute. DepositGuard stores it, gets it
+        signed by landlord and tenant, and lines it up against move-out so nobody argues from memory.
+      </p>
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link href="/dashboard" className="btn">Open dashboard</Link>
+        <Link href="/login" className="btn-ghost">Log in</Link>
+      </div>
+
+      <div className="mt-16 grid gap-4 sm:grid-cols-3">
+        {steps.map((s, i) => (
+          <div key={s.title} className="card p-5">
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand">{i + 1}</div>
+            <h2 className="mt-3 font-semibold">{s.title}</h2>
+            <p className="mt-1 text-sm text-stone-600">{s.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-12 text-sm text-stone-500">
+        No AI runs inside DepositGuard. The thinking happens in the Claude plan you already pay for, connected over MCP.
+      </p>
     </div>
   );
 }
