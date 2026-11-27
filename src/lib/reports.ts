@@ -1,8 +1,11 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { db, CONDITIONS, type Condition } from "./db";
 
-export type Item = { id: string; name: string; condition: Condition; notes: string; position: number };
-export type Room = { id: string; name: string; position: number; items: Item[] };
+export type Item = { id: string; name: string; condition: Condition; notes: string; tenant_note: string; position: number };
+export type Photo = { id: string; room_id: string | null; created_at: string };
+export type Room = { id: string; name: string; position: number; items: Item[]; photos: Photo[] };
+export type ReportStatus = "draft" | "awaiting_tenant" | "signed";
 export type ReportSummary = {
   id: string;
   property_address: string;
@@ -26,6 +29,12 @@ export type Report = {
   share_token: string;
   created_at: string;
   updated_at: string;
+  landlord_signed_name: string | null;
+  landlord_signed_at: string | null;
+  tenant_signed_name: string | null;
+  tenant_signed_at: string | null;
+  tenant_comment: string;
+  fingerprint: string | null;
   rooms: Room[];
 };
 
@@ -58,22 +67,26 @@ export async function listReports(userId: string): Promise<ReportSummary[]> {
 
 async function loadRooms(reportId: string): Promise<Room[]> {
   const sql = await db();
-  const rooms = await sql<Omit<Room, "items">[]>`
+  const photos = await sql<Photo[]>`
+    select id, room_id, created_at from photos where report_id = ${reportId} order by created_at`;
+  const rooms = await sql<Omit<Room, "items" | "photos">[]>`
     select id, name, position from rooms where report_id = ${reportId} order by position, name`;
   if (rooms.length === 0) return [];
   const items = await sql<(Item & { room_id: string })[]>`
-    select id, room_id, name, condition, notes, position from items
+    select id, room_id, name, condition, notes, tenant_note, position from items
     where room_id in ${sql(rooms.map((r) => r.id))} order by position, name`;
   return rooms.map((r) => ({
     ...r,
     items: items
       .filter((i) => i.room_id === r.id)
-      .map((i) => ({ id: i.id, name: i.name, condition: i.condition, notes: i.notes, position: i.position })),
+      .map((i) => ({ id: i.id, name: i.name, condition: i.condition, notes: i.notes, tenant_note: i.tenant_note, position: i.position })),
+    photos: photos.filter((p) => p.room_id === r.id),
   }));
 }
 
 const REPORT_COLS = `id, user_id, property_address, landlord_name, tenant_name, tenant_email,
-  to_char(inspection_date, 'YYYY-MM-DD') as inspection_date, summary, status, share_token, created_at, updated_at`;
+  to_char(inspection_date, 'YYYY-MM-DD') as inspection_date, summary, status, share_token, created_at, updated_at,
+  landlord_signed_name, landlord_signed_at, tenant_signed_name, tenant_signed_at, tenant_comment, fingerprint`;
 
 export async function getReport(userId: string, reportId: string): Promise<Report | null> {
   if (!/^[0-9a-f-]{36}$/i.test(reportId)) return null;
@@ -132,7 +145,7 @@ async function roomReport(userId: string, roomId: string): Promise<string | null
   const sql = await db();
   const [r] = await sql<{ report_id: string }[]>`
     select ro.report_id from rooms ro join reports r on r.id = ro.report_id
-    where ro.id = ${roomId} and r.user_id = ${userId}`;
+    where ro.id = ${roomId} and r.user_id = ${userId} and r.status = 'draft'`;
   return r?.report_id ?? null;
 }
 
@@ -140,7 +153,7 @@ async function itemReport(userId: string, itemId: string): Promise<string | null
   const sql = await db();
   const [r] = await sql<{ report_id: string }[]>`
     select ro.report_id from items i join rooms ro on ro.id = i.room_id join reports r on r.id = ro.report_id
-    where i.id = ${itemId} and r.user_id = ${userId}`;
+    where i.id = ${itemId} and r.user_id = ${userId} and r.status = 'draft'`;
   return r?.report_id ?? null;
 }
 
@@ -152,7 +165,7 @@ export async function updateReport(userId: string, reportId: string, patch: Repo
   const sql = await db();
   const keys = Object.keys(patch).filter((k) => patch[k as keyof ReportPatch] !== undefined) as (keyof ReportPatch)[];
   if (keys.length === 0) return;
-  await sql`update reports set ${sql(patch, keys)}, updated_at = now() where id = ${reportId} and user_id = ${userId}`;
+  await sql`update reports set ${sql(patch, keys)}, updated_at = now() where id = ${reportId} and user_id = ${userId} and status = 'draft'`;
 }
 
 export async function deleteReport(userId: string, reportId: string) {
@@ -162,7 +175,7 @@ export async function deleteReport(userId: string, reportId: string) {
 
 export async function addRoom(userId: string, reportId: string, room: NewRoom): Promise<boolean> {
   const sql = await db();
-  const [own] = await sql`select 1 from reports where id = ${reportId} and user_id = ${userId}`;
+  const [own] = await sql`select 1 from reports where id = ${reportId} and user_id = ${userId} and status = 'draft'`;
   if (!own) return false;
   const [{ max }] = await sql<{ max: number }[]>`select coalesce(max(position), -1)::int as max from rooms where report_id = ${reportId}`;
   await insertRooms(reportId, [room], max + 1);
@@ -218,4 +231,76 @@ export async function deleteItem(userId: string, itemId: string) {
   const sql = await db();
   await sql`delete from items where id = ${itemId}`;
   await touch(reportId);
+}
+
+// ---------- Stage 2: signing ----------
+
+/** A stable SHA-256 of what was signed, so either party can prove the content never changed. */
+export function fingerprintOf(r: Report): string {
+  const canonical = {
+    property_address: r.property_address,
+    landlord_name: r.landlord_name,
+    tenant_name: r.tenant_name,
+    inspection_date: r.inspection_date,
+    summary: r.summary,
+    rooms: r.rooms.map((ro) => ({
+      name: ro.name,
+      items: ro.items.map((i) => ({ name: i.name, condition: i.condition, notes: i.notes })),
+      photos: ro.photos.map((p) => p.id),
+    })),
+  };
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+}
+
+export async function landlordSign(userId: string, reportId: string, name: string): Promise<boolean> {
+  const r = await getReport(userId, reportId);
+  if (!r || r.status !== "draft" || !name.trim()) return false;
+  const sql = await db();
+  await sql`
+    update reports set landlord_signed_name = ${name.trim()}, landlord_signed_at = now(),
+      fingerprint = ${fingerprintOf(r)}, status = 'awaiting_tenant', updated_at = now()
+    where id = ${reportId} and user_id = ${userId} and status = 'draft'`;
+  return true;
+}
+
+/** Landlord takes the report back to draft before the tenant has signed. */
+export async function unlockReport(userId: string, reportId: string) {
+  const sql = await db();
+  await sql`
+    update reports set status = 'draft', landlord_signed_name = null, landlord_signed_at = null, fingerprint = null,
+      updated_at = now()
+    where id = ${reportId} and user_id = ${userId} and status = 'awaiting_tenant'`;
+}
+
+export type PublicReport = Omit<Report, "user_id" | "tenant_email">;
+
+export async function getReportByToken(token: string): Promise<PublicReport | null> {
+  if (!/^[0-9a-f]{32}$/.test(token)) return null;
+  const sql = await db();
+  const [r] = await sql.unsafe<Report[]>(`select ${REPORT_COLS} from reports where share_token = $1`, [token]);
+  if (!r || r.status === "draft") return null;
+  const rest: Partial<Report> = { ...r };
+  delete rest.user_id;
+  delete rest.tenant_email;
+  return { ...(rest as PublicReport), rooms: await loadRooms(r.id) };
+}
+
+export async function setTenantNote(token: string, itemId: string, note: string): Promise<boolean> {
+  const sql = await db();
+  const res = await sql`
+    update items i set tenant_note = ${note.slice(0, 2000)}
+    from rooms ro, reports r
+    where i.id = ${itemId} and ro.id = i.room_id and r.id = ro.report_id
+      and r.share_token = ${token} and r.status = 'awaiting_tenant'`;
+  return res.count > 0;
+}
+
+export async function tenantSign(token: string, name: string, comment: string, ip: string): Promise<boolean> {
+  if (!name.trim()) return false;
+  const sql = await db();
+  const res = await sql`
+    update reports set tenant_signed_name = ${name.trim()}, tenant_signed_at = now(), tenant_signed_ip = ${ip},
+      tenant_comment = ${comment.slice(0, 4000)}, status = 'signed', updated_at = now()
+    where share_token = ${token} and status = 'awaiting_tenant'`;
+  return res.count > 0;
 }

@@ -13,6 +13,8 @@ import {
   updateReportAction,
 } from "@/app/actions";
 import { conditionClass } from "./ConditionBadge";
+import PhotoUploader from "./PhotoUploader";
+import LandlordSignPanel from "./LandlordSignPanel";
 
 const CONDITIONS = ["excellent", "good", "fair", "poor", "damaged"] as const;
 type Condition = (typeof CONDITIONS)[number];
@@ -146,6 +148,7 @@ export default function ReportEditor({ report }: { report: Report }) {
                 Delete room
               </button>
             </div>
+            <PhotoUploader reportId={id} roomId={room.id} photos={room.photos} />
             <ul className="divide-y divide-stone-100">
               {room.items.map((item) => (
                 <li key={item.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_130px_1fr_auto] sm:items-start">
@@ -193,6 +196,8 @@ export default function ReportEditor({ report }: { report: Report }) {
           Delete report
         </button>
       </div>
+
+      <LandlordSignPanel reportId={id} defaultName={report.landlord_name} />
     </div>
   );
 }

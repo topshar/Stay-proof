@@ -62,6 +62,27 @@ async function migrate(sql: ReturnType<typeof postgres>) {
     create index if not exists reports_user_idx on reports(user_id);
     create index if not exists rooms_report_idx on rooms(report_id);
     create index if not exists items_room_idx on items(room_id);
+
+    -- Stage 2: signing and photos
+    alter table reports add column if not exists landlord_signed_name text;
+    alter table reports add column if not exists landlord_signed_at timestamptz;
+    alter table reports add column if not exists tenant_signed_name text;
+    alter table reports add column if not exists tenant_signed_at timestamptz;
+    alter table reports add column if not exists tenant_signed_ip text;
+    alter table reports add column if not exists tenant_comment text not null default '';
+    alter table reports add column if not exists fingerprint text;
+    alter table items add column if not exists tenant_note text not null default '';
+    create table if not exists photos (
+      id uuid primary key default gen_random_uuid(),
+      report_id uuid not null references reports(id) on delete cascade,
+      room_id uuid references rooms(id) on delete cascade,
+      storage text not null,
+      storage_key text not null,
+      content_type text not null default 'image/jpeg',
+      data bytea,
+      created_at timestamptz not null default now()
+    );
+    create index if not exists photos_report_idx on photos(report_id);
   `);
   // Seed the reviewer/demo account once.
   const email = (process.env.DEMO_EMAIL ?? "demo@stayproof.app").toLowerCase();

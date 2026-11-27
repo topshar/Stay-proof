@@ -5,6 +5,12 @@ import { appOrigin } from "@/lib/origin";
 import { logoutAction } from "@/app/actions";
 import CopyField from "@/components/CopyField";
 
+const STATUS: Record<string, [string, string]> = {
+  draft: ["Draft", "bg-stone-100 text-stone-700"],
+  awaiting_tenant: ["Awaiting tenant", "bg-amber-100 text-amber-800"],
+  signed: ["Signed", "bg-emerald-100 text-emerald-800"],
+};
+
 export default async function Dashboard() {
   const user = await requireUser();
   const [list, origin] = await Promise.all([listReports(user.id), appOrigin()]);
@@ -38,7 +44,9 @@ export default async function Dashboard() {
                   <Link href={`/reports/${r.id}`} className="card block p-4 hover:border-brand">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium">{r.property_address}</p>
-                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs capitalize text-stone-700">{r.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS[r.status]?.[1] ?? "bg-stone-100 text-stone-700"}`}>
+                        {STATUS[r.status]?.[0] ?? r.status}
+                      </span>
                     </div>
                     <p className="mt-1 text-sm text-stone-600">
                       {r.tenant_name ? `Tenant: ${r.tenant_name} · ` : ""}Inspected {r.inspection_date} · {r.room_count} rooms ·{" "}

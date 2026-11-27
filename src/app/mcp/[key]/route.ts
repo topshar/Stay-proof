@@ -106,7 +106,8 @@ function buildServer(user: User, origin: string) {
       const rest: Partial<typeof r> = { ...r };
       delete rest.user_id;
       delete rest.share_token;
-      return text({ ...rest, url: link(r.id) });
+      const tenant_link = r.status === "draft" ? undefined : `${origin}/s/${r.share_token}`;
+      return text({ ...rest, url: link(r.id), tenant_link });
     },
   );
 
@@ -119,7 +120,7 @@ function buildServer(user: User, origin: string) {
     },
     async ({ report_id, room }) => {
       const ok = await reports.addRoom(user.id, report_id, room);
-      return ok ? text(`Added ${room.name} with ${room.items.length} items. ${link(report_id)}`) : errorText("Report not found");
+      return ok ? text(`Added ${room.name} with ${room.items.length} items. ${link(report_id)}`) : errorText("Report not found, or it has been signed and is locked");
     },
   );
 
@@ -137,7 +138,7 @@ function buildServer(user: User, origin: string) {
     },
     async ({ item_id, ...patch }) => {
       const ok = await reports.updateItem(user.id, item_id, patch);
-      return ok ? text("Item updated") : errorText("Item not found");
+      return ok ? text("Item updated") : errorText("Item not found, or the report has been signed and is locked");
     },
   );
 

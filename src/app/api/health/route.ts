@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { checkS3 } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET() {
     const sql = await db();
     const [{ users }] = await sql<{ users: number }[]>`select count(*)::int as users from users`;
     const [demo] = await sql`select 1 from users where email = ${demoEmail}`;
-    Object.assign(out, { database: "ok", users, demo_account_ready: Boolean(demo) });
+    Object.assign(out, { database: "ok", users, demo_account_ready: Boolean(demo), photo_storage: await checkS3() });
   } catch (e) {
     out.database = "error";
     out.error = e instanceof Error ? e.message.replace(/postgres(ql)?:\/\/\S+/gi, "[url]") : String(e);

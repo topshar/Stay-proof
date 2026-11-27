@@ -2,6 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { db } from "@/lib/db";
+import { removePhotoObject } from "@/lib/storage";
 import { logIn, logOut, requireUser } from "@/lib/auth";
 import * as reports from "@/lib/reports";
 import type { Condition } from "@/lib/db";
@@ -67,4 +70,43 @@ export async function deleteItemAction(reportId: string, itemId: string) {
   const user = await requireUser();
   await reports.deleteItem(user.id, itemId);
   revalidatePath(`/reports/${reportId}`);
+}
+
+// ---------- Stage 2 ----------
+
+export async function landlordSignAction(reportId: string, name: string) {
+  const user = await requireUser();
+  const ok = await reports.landlordSign(user.id, reportId, name);
+  revalidatePath(`/reports/${reportId}`);
+  return ok;
+}
+
+export async function unlockReportAction(reportId: string) {
+  const user = await requireUser();
+  await reports.unlockReport(user.id, reportId);
+  revalidatePath(`/reports/${reportId}`);
+}
+
+export async function deletePhotoAction(reportId: string, photoId: string) {
+  const user = await requireUser();
+  const sql = await db();
+  const [row] = await sql<{ storage: string; storage_key: string }[]>`
+    delete from photos p using reports r
+    where p.id = ${photoId} and p.report_id = r.id and r.id = ${reportId} and r.user_id = ${user.id} and r.status = 'draft'
+    returning p.storage, p.storage_key`;
+  if (row) await removePhotoObject(row);
+  revalidatePath(`/reports/${reportId}`);
+}
+
+export async function tenantNoteAction(token: string, itemId: string, note: string) {
+  await reports.setTenantNote(token, itemId, note);
+  revalidatePath(`/s/${token}`);
+}
+
+export async function tenantSignAction(token: string, name: string, comment: string) {
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  const ok = await reports.tenantSign(token, name, comment, ip);
+  revalidatePath(`/s/${token}`);
+  return ok;
 }
