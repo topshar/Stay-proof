@@ -6,7 +6,7 @@ const steps = [
     body: "Drop your move-in photos into your own Claude and say \"make a condition report for 12 Park St\". Claude reads every photo.",
   },
   {
-    title: "Review it in DepositGuard",
+    title: "Review it in StayProof",
     body: "The room-by-room report lands here. Fix a rating, add a note, then send one link to your tenant.",
   },
   {
@@ -23,7 +23,7 @@ export default function Home() {
         End deposit fights with a condition report both sides signed.
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-stone-600">
-        Your Claude turns move-in photos into a detailed, room-by-room report in a minute. DepositGuard stores it, gets it
+        Your Claude turns move-in photos into a detailed, room-by-room report in a minute. StayProof stores it, gets it
         signed by landlord and tenant, and lines it up against move-out so nobody argues from memory.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
@@ -42,7 +42,7 @@ export default function Home() {
       </div>
 
       <p className="mt-12 text-sm text-stone-500">
-        No AI runs inside DepositGuard. The thinking happens in the Claude plan you already pay for, connected over MCP.
+        No AI runs inside StayProof. The thinking happens in the Claude plan you already pay for, connected over MCP.
       </p>
     </div>
   );

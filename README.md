@@ -1,8 +1,8 @@
-# DepositGuard
+# StayProof
 
-Move-in condition reports for rentals, written by **your own Claude** and kept, edited and signed in DepositGuard.
+Move-in condition reports for rentals, written by **your own Claude** and kept, edited and signed in StayProof.
 
-- Claude looks at move-in photos and calls DepositGuard's MCP tools to create a room-by-room report.
+- Claude looks at move-in photos and calls StayProof's MCP tools to create a room-by-room report.
 - The landlord reviews and edits it in the web app.
 - (Stage 2) Landlord and tenant both sign from a link. (Stage 3) Move-out comparison side by side.
 

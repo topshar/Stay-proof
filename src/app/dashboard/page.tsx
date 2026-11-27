@@ -59,8 +59,8 @@ export default async function Dashboard() {
           </div>
           <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-stone-700">
             <li>In Claude, open Settings, then Connectors.</li>
-            <li>Choose &ldquo;Add custom connector&rdquo;, name it DepositGuard and paste the link.</li>
-            <li>In a new chat, turn DepositGuard on, attach your move-in photos and ask for a condition report.</li>
+            <li>Choose &ldquo;Add custom connector&rdquo;, name it StayProof and paste the link.</li>
+            <li>In a new chat, turn StayProof on, attach your move-in photos and ask for a condition report.</li>
           </ol>
         </aside>
       </div>

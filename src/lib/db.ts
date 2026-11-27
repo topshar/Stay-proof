@@ -64,7 +64,7 @@ async function migrate(sql: ReturnType<typeof postgres>) {
     create index if not exists items_room_idx on items(room_id);
   `);
   // Seed the reviewer/demo account once.
-  const email = (process.env.DEMO_EMAIL ?? "demo@depositguard.app").toLowerCase();
+  const email = (process.env.DEMO_EMAIL ?? "demo@stayproof.app").toLowerCase();
   const [existing] = await sql`select id from users where email = ${email}`;
   if (!existing) {
     const hash = await bcrypt.hash(process.env.DEMO_PASSWORD ?? "movein2026", 10);

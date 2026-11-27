@@ -40,10 +40,10 @@ function errorText(message: string) {
 
 function buildServer(user: User, origin: string) {
   const server = new McpServer(
-    { name: "DepositGuard", version: "0.1.0" },
+    { name: "StayProof", version: "0.1.0" },
     {
       instructions:
-        "DepositGuard stores rental property condition reports. When the user shares move-in photos of a property, " +
+        "StayProof stores rental property condition reports. When the user shares move-in photos of a property, " +
         "look at every photo carefully, group what you see by room, and call create_condition_report once with all rooms. " +
         "Be specific and factual in notes (where, how big, how many). After creating, give the user the report link so they can review, edit and send it.",
     },
@@ -149,7 +149,7 @@ async function handle(req: Request, ctx: { params: Promise<{ key: string }> }) {
   const user = await userByApiKey(key);
   if (!user) {
     return Response.json(
-      { jsonrpc: "2.0", error: { code: -32001, message: "Invalid connector link. Copy it again from your DepositGuard dashboard." }, id: null },
+      { jsonrpc: "2.0", error: { code: -32001, message: "Invalid connector link. Copy it again from your StayProof dashboard." }, id: null },
       { status: 401 },
     );
   }

@@ -10,7 +10,7 @@ export default async function LoginPage() {
       <p className="mt-1 text-sm text-stone-600">Landlord and property manager accounts.</p>
       <LoginForm />
       <p className="mt-6 rounded-md bg-brand-soft p-3 text-xs text-stone-700">
-        Reviewer test account: <b>demo@depositguard.app</b> / <b>movein2026</b>
+        Reviewer test account: <b>demo@stayproof.app</b> / <b>movein2026</b>
       </p>
     </div>
   );
