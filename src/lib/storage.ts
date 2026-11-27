@@ -31,17 +31,23 @@ export async function checkS3(): Promise<string> {
   }
 }
 
-export async function savePhoto(reportId: string, roomId: string | null, bytes: Uint8Array, contentType: string) {
+export async function savePhoto(
+  reportId: string,
+  roomId: string | null,
+  bytes: Uint8Array,
+  contentType: string,
+  phase: "move_in" | "move_out" = "move_in",
+) {
   const sql = await db();
   const id = randomUUID();
   if (s3Configured()) {
     const key = `reports/${reportId}/${id}`;
     await s3().send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: contentType }));
-    await sql`insert into photos (id, report_id, room_id, storage, storage_key, content_type)
-              values (${id}, ${reportId}, ${roomId}, 's3', ${key}, ${contentType})`;
+    await sql`insert into photos (id, report_id, room_id, storage, storage_key, content_type, phase)
+              values (${id}, ${reportId}, ${roomId}, 's3', ${key}, ${contentType}, ${phase})`;
   } else {
-    await sql`insert into photos (id, report_id, room_id, storage, storage_key, content_type, data)
-              values (${id}, ${reportId}, ${roomId}, 'db', ${id}, ${contentType}, ${Buffer.from(bytes)})`;
+    await sql`insert into photos (id, report_id, room_id, storage, storage_key, content_type, data, phase)
+              values (${id}, ${reportId}, ${roomId}, 'db', ${id}, ${contentType}, ${Buffer.from(bytes)}, ${phase})`;
   }
   return id;
 }

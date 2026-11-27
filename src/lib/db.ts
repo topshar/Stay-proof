@@ -83,6 +83,14 @@ async function migrate(sql: ReturnType<typeof postgres>) {
       created_at timestamptz not null default now()
     );
     create index if not exists photos_report_idx on photos(report_id);
+
+    -- Stage 3: move-out
+    alter table photos add column if not exists phase text not null default 'move_in';
+    alter table items add column if not exists move_out_condition text;
+    alter table items add column if not exists move_out_notes text not null default '';
+    alter table items add column if not exists deduction_cents int not null default 0;
+    alter table reports add column if not exists move_out_date date;
+    alter table reports add column if not exists bond_cents int not null default 0;
   `);
   // Seed the reviewer/demo account once.
   const email = (process.env.DEMO_EMAIL ?? "demo@stayproof.app").toLowerCase();

@@ -92,10 +92,12 @@ export async function deletePhotoAction(reportId: string, photoId: string) {
   const sql = await db();
   const [row] = await sql<{ storage: string; storage_key: string }[]>`
     delete from photos p using reports r
-    where p.id = ${photoId} and p.report_id = r.id and r.id = ${reportId} and r.user_id = ${user.id} and r.status = 'draft'
+    where p.id = ${photoId} and p.report_id = r.id and r.id = ${reportId} and r.user_id = ${user.id}
+      and ((p.phase = 'move_in' and r.status = 'draft') or (p.phase = 'move_out' and r.status = 'signed'))
     returning p.storage, p.storage_key`;
   if (row) await removePhotoObject(row);
   revalidatePath(`/reports/${reportId}`);
+  revalidatePath(`/reports/${reportId}/move-out`);
 }
 
 export async function tenantNoteAction(token: string, itemId: string, note: string) {
@@ -109,4 +111,22 @@ export async function tenantSignAction(token: string, name: string, comment: str
   const ok = await reports.tenantSign(token, name, comment, ip);
   revalidatePath(`/s/${token}`);
   return ok;
+}
+
+// ---------- Stage 3 ----------
+
+export async function updateMoveOutAction(
+  reportId: string,
+  itemId: string,
+  patch: { condition?: Condition | null; notes?: string; deduction_cents?: number },
+) {
+  const user = await requireUser();
+  await reports.updateMoveOutItem(user.id, reportId, itemId, patch);
+  revalidatePath(`/reports/${reportId}/move-out`);
+}
+
+export async function setBondAction(reportId: string, bondCents: number) {
+  const user = await requireUser();
+  await reports.setBond(user.id, reportId, bondCents);
+  revalidatePath(`/reports/${reportId}/move-out`);
 }

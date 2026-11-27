@@ -45,7 +45,7 @@ export default async function Dashboard() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium">{r.property_address}</p>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS[r.status]?.[1] ?? "bg-stone-100 text-stone-700"}`}>
-                        {STATUS[r.status]?.[0] ?? r.status}
+                        {r.move_out_date ? "Move-out recorded" : STATUS[r.status]?.[0] ?? r.status}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-stone-600">

@@ -45,7 +45,9 @@ function buildServer(user: User, origin: string) {
       instructions:
         "StayProof stores rental property condition reports. When the user shares move-in photos of a property, " +
         "look at every photo carefully, group what you see by room, and call create_condition_report once with all rooms. " +
-        "Be specific and factual in notes (where, how big, how many). After creating, give the user the report link so they can review, edit and send it.",
+        "Be specific and factual in notes (where, how big, how many). After creating, give the user the report link so they can review, edit and send it. " +
+        "At move-out, when the user shares move-out photos: call list_reports to find the property, get_report to read the signed move-in condition of every item, " +
+        "then compare the photos against it and call record_move_out_inspection once with every item you can assess. Distinguish fair wear and tear (no deduction) from damage.",
     },
   );
   const link = (id: string) => `${origin}/reports/${id}`;
@@ -139,6 +141,62 @@ function buildServer(user: User, origin: string) {
     async ({ item_id, ...patch }) => {
       const ok = await reports.updateItem(user.id, item_id, patch);
       return ok ? text("Item updated") : errorText("Item not found, or the report has been signed and is locked");
+    },
+  );
+
+  server.registerTool(
+    "record_move_out_inspection",
+    {
+      title: "Record move-out inspection",
+      description:
+        "Record the move-out condition of items in a signed move-in report, so StayProof can show move-in and move-out side by side. " +
+        "First call get_report to get item ids and their move-in condition and notes, then compare the move-out photos item by item. " +
+        "Only include items you could actually assess. Suggest a deduction only for damage beyond fair wear and tear; the landlord reviews every amount.",
+      inputSchema: {
+        report_id: z.string(),
+        move_out_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD; defaults to today"),
+        items: z
+          .array(
+            z.object({
+              item_id: z.string().describe("Item id from get_report"),
+              condition,
+              notes: z.string().optional().describe("What changed since move-in, factually. Say 'Unchanged since move-in' if so."),
+              suggested_deduction: z
+                .number()
+                .min(0)
+                .optional()
+                .describe("Suggested repair/cleaning cost in dollars, only for damage beyond fair wear and tear. Omit or 0 otherwise."),
+            }),
+          )
+          .min(1),
+      },
+    },
+    async ({ report_id, move_out_date, items }) => {
+      const res = await reports.recordMoveOut(user.id, report_id, {
+        move_out_date,
+        entries: items.map((i) => ({
+          item_id: i.item_id,
+          condition: i.condition,
+          notes: i.notes,
+          deduction_cents: i.suggested_deduction !== undefined ? Math.round(i.suggested_deduction * 100) : undefined,
+        })),
+      });
+      if (!res.ok)
+        return errorText(
+          "Report not found, or it hasn't been signed by both landlord and tenant yet. Move-out needs a signed move-in report.",
+        );
+      const r = await reports.getReport(user.id, report_id);
+      const all = r!.rooms.flatMap((ro) => ro.items);
+      const worse = all.filter((i) => reports.change(i) === "worse").map((i) => i.name);
+      const total = all.reduce((n, i) => n + i.deduction_cents, 0) / 100;
+      return text({
+        updated: res.updated,
+        unknown_item_ids: res.unknown,
+        items_still_unassessed: all.filter((i) => !i.move_out_condition).map((i) => ({ id: i.id, name: i.name })),
+        worse_than_move_in: worse,
+        total_suggested_deductions: `$${total.toFixed(2)}`,
+        comparison_url: `${origin}/reports/${report_id}/move-out`,
+      });
     },
   );
 

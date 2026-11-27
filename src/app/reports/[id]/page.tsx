@@ -51,6 +51,14 @@ export default async function ReportPage({ params }: PageProps<"/reports/[id]">)
         <section className="card mt-4 border-emerald-300 bg-emerald-50/60 p-5 print:hidden">
           <p className="font-semibold text-emerald-900">Signed by both parties. This report is locked.</p>
           <p className="mt-1 text-sm text-stone-700">Keep it for move-out. Use Print to save a PDF copy.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link href={`/reports/${report.id}/move-out`} className="btn">
+              {report.move_out_date ? "Open move-out comparison" : "Start move-out inspection"}
+            </Link>
+            <span className="text-xs text-stone-600">
+              Or send Claude your move-out photos and ask it to &ldquo;do the move-out inspection for {report.property_address.split(",")[0]}&rdquo;.
+            </span>
+          </div>
         </section>
       )}
 

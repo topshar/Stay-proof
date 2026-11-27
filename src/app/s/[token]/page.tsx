@@ -5,6 +5,7 @@ import ReportView, { SignatureBlock } from "@/components/ReportView";
 import TenantNote from "@/components/TenantNote";
 import TenantSignForm from "@/components/TenantSignForm";
 import PrintButton from "@/components/PrintButton";
+import { ComparisonView } from "@/components/compare";
 
 export const metadata: Metadata = { title: "Condition report to review · StayProof", robots: { index: false } };
 
@@ -38,6 +39,7 @@ export default async function TenantPage({ params }: PageProps<"/s/[token]">) {
       />
       <SignatureBlock report={report} />
       {open && <TenantSignForm token={token} defaultName={report.tenant_name} />}
+      {report.status === "signed" && report.move_out_date && <ComparisonView report={report} token={token} />}
     </div>
   );
 }

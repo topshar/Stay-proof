@@ -12,9 +12,13 @@ export async function POST(req: Request, ctx: RouteContext<"/api/reports/[id]/ph
   const sql = await db();
   const [report] = await sql`select status from reports where id = ${id} and user_id = ${user.id}`;
   if (!report) return Response.json({ error: "Report not found" }, { status: 404 });
-  if (report.status !== "draft") return Response.json({ error: "This report is signed and locked" }, { status: 409 });
-
   const form = await req.formData();
+  const phase = form.get("phase") === "move_out" ? "move_out" : "move_in";
+  if (phase === "move_in" && report.status !== "draft")
+    return Response.json({ error: "This report is signed and locked" }, { status: 409 });
+  if (phase === "move_out" && report.status !== "signed")
+    return Response.json({ error: "Move-out photos can be added once both parties have signed" }, { status: 409 });
+
   const file = form.get("file");
   const roomId = String(form.get("roomId") ?? "") || null;
   if (!(file instanceof File)) return Response.json({ error: "No file" }, { status: 400 });
@@ -24,7 +28,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/reports/[id]/ph
     const [room] = await sql`select 1 from rooms where id = ${roomId} and report_id = ${id}`;
     if (!room) return Response.json({ error: "Room not found" }, { status: 404 });
   }
-  const photoId = await savePhoto(id, roomId, new Uint8Array(await file.arrayBuffer()), file.type);
+  const photoId = await savePhoto(id, roomId, new Uint8Array(await file.arrayBuffer()), file.type, phase);
   await sql`update reports set updated_at = now() where id = ${id}`;
   return Response.json({ id: photoId });
 }

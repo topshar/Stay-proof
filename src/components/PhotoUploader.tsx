@@ -19,7 +19,17 @@ async function compress(file: File): Promise<Blob> {
   }
 }
 
-export default function PhotoUploader({ reportId, roomId, photos }: { reportId: string; roomId: string; photos: { id: string }[] }) {
+export default function PhotoUploader({
+  reportId,
+  roomId,
+  photos,
+  phase = "move_in",
+}: {
+  reportId: string;
+  roomId: string;
+  photos: { id: string }[];
+  phase?: "move_in" | "move_out";
+}) {
   const input = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [busy, setBusy] = useState("");
@@ -34,6 +44,7 @@ export default function PhotoUploader({ reportId, roomId, photos }: { reportId: 
       const blob = await compress(f);
       body.append("file", new File([blob], f.name.replace(/\.\w+$/, "") + ".jpg", { type: blob.type || "image/jpeg" }));
       body.append("roomId", roomId);
+      body.append("phase", phase);
       const res = await fetch(`/api/reports/${reportId}/photos`, { method: "POST", body });
       if (!res.ok) setError((await res.json().catch(() => ({}))).error ?? "Upload failed");
     }
@@ -59,7 +70,7 @@ export default function PhotoUploader({ reportId, roomId, photos }: { reportId: 
         ))}
         <button type="button" className="grid h-20 w-28 place-items-center rounded-md border border-dashed border-stone-300 text-xs text-stone-500 hover:border-brand hover:text-brand"
           onClick={() => input.current?.click()} disabled={Boolean(busy)}>
-          {busy || "+ Add photos"}
+          {busy || (phase === "move_out" ? "+ Move-out photos" : "+ Add photos")}
         </button>
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && upload(e.target.files)} />
       </div>

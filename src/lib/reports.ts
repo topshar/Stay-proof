@@ -2,9 +2,19 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { db, CONDITIONS, type Condition } from "./db";
 
-export type Item = { id: string; name: string; condition: Condition; notes: string; tenant_note: string; position: number };
-export type Photo = { id: string; room_id: string | null; created_at: string };
-export type Room = { id: string; name: string; position: number; items: Item[]; photos: Photo[] };
+export type Item = {
+  id: string;
+  name: string;
+  condition: Condition;
+  notes: string;
+  tenant_note: string;
+  position: number;
+  move_out_condition: Condition | null;
+  move_out_notes: string;
+  deduction_cents: number;
+};
+export type Photo = { id: string; room_id: string | null; phase: "move_in" | "move_out"; created_at: string };
+export type Room = { id: string; name: string; position: number; items: Item[]; photos: Photo[]; move_out_photos: Photo[] };
 export type ReportStatus = "draft" | "awaiting_tenant" | "signed";
 export type ReportSummary = {
   id: string;
@@ -12,6 +22,7 @@ export type ReportSummary = {
   tenant_name: string;
   inspection_date: string;
   status: string;
+  move_out_date: string | null;
   room_count: number;
   item_count: number;
   updated_at: string;
@@ -35,6 +46,8 @@ export type Report = {
   tenant_signed_at: string | null;
   tenant_comment: string;
   fingerprint: string | null;
+  move_out_date: string | null;
+  bond_cents: number;
   rooms: Room[];
 };
 
@@ -58,7 +71,7 @@ export async function listReports(userId: string): Promise<ReportSummary[]> {
   const sql = await db();
   return sql<ReportSummary[]>`
     select r.id, r.property_address, r.tenant_name, to_char(r.inspection_date, 'YYYY-MM-DD') as inspection_date,
-           r.status, r.updated_at,
+           r.status, r.updated_at, to_char(r.move_out_date, 'YYYY-MM-DD') as move_out_date,
            (select count(*)::int from rooms where report_id = r.id) as room_count,
            (select count(*)::int from items i join rooms ro on ro.id = i.room_id where ro.report_id = r.id) as item_count
     from reports r where r.user_id = ${userId}
@@ -68,25 +81,30 @@ export async function listReports(userId: string): Promise<ReportSummary[]> {
 async function loadRooms(reportId: string): Promise<Room[]> {
   const sql = await db();
   const photos = await sql<Photo[]>`
-    select id, room_id, created_at from photos where report_id = ${reportId} order by created_at`;
-  const rooms = await sql<Omit<Room, "items" | "photos">[]>`
+    select id, room_id, phase, created_at from photos where report_id = ${reportId} order by created_at`;
+  const rooms = await sql<Omit<Room, "items" | "photos" | "move_out_photos">[]>`
     select id, name, position from rooms where report_id = ${reportId} order by position, name`;
   if (rooms.length === 0) return [];
   const items = await sql<(Item & { room_id: string })[]>`
-    select id, room_id, name, condition, notes, tenant_note, position from items
+    select id, room_id, name, condition, notes, tenant_note, position, move_out_condition, move_out_notes, deduction_cents from items
     where room_id in ${sql(rooms.map((r) => r.id))} order by position, name`;
   return rooms.map((r) => ({
     ...r,
     items: items
       .filter((i) => i.room_id === r.id)
-      .map((i) => ({ id: i.id, name: i.name, condition: i.condition, notes: i.notes, tenant_note: i.tenant_note, position: i.position })),
-    photos: photos.filter((p) => p.room_id === r.id),
+      .map((i) => ({
+        id: i.id, name: i.name, condition: i.condition, notes: i.notes, tenant_note: i.tenant_note, position: i.position,
+        move_out_condition: i.move_out_condition, move_out_notes: i.move_out_notes, deduction_cents: i.deduction_cents,
+      })),
+    photos: photos.filter((p) => p.room_id === r.id && p.phase === "move_in"),
+    move_out_photos: photos.filter((p) => p.room_id === r.id && p.phase === "move_out"),
   }));
 }
 
 const REPORT_COLS = `id, user_id, property_address, landlord_name, tenant_name, tenant_email,
   to_char(inspection_date, 'YYYY-MM-DD') as inspection_date, summary, status, share_token, created_at, updated_at,
-  landlord_signed_name, landlord_signed_at, tenant_signed_name, tenant_signed_at, tenant_comment, fingerprint`;
+  landlord_signed_name, landlord_signed_at, tenant_signed_name, tenant_signed_at, tenant_comment, fingerprint,
+  to_char(move_out_date, 'YYYY-MM-DD') as move_out_date, bond_cents`;
 
 export async function getReport(userId: string, reportId: string): Promise<Report | null> {
   if (!/^[0-9a-f-]{36}$/i.test(reportId)) return null;
@@ -303,4 +321,72 @@ export async function tenantSign(token: string, name: string, comment: string, i
       tenant_comment = ${comment.slice(0, 4000)}, status = 'signed', updated_at = now()
     where share_token = ${token} and status = 'awaiting_tenant'`;
   return res.count > 0;
+}
+
+// ---------- Stage 3: move-out ----------
+
+export const SEVERITY: Record<Condition, number> = { excellent: 0, good: 1, fair: 2, poor: 3, damaged: 4 };
+
+export function change(item: Item): "worse" | "same" | "better" | "pending" {
+  if (!item.move_out_condition) return "pending";
+  const d = SEVERITY[item.move_out_condition] - SEVERITY[item.condition];
+  return d > 0 ? "worse" : d < 0 ? "better" : "same";
+}
+
+export type MoveOutEntry = { item_id: string; condition: Condition; notes?: string; deduction_cents?: number };
+
+/** Move-out can be recorded once both parties have signed the move-in report. */
+async function signedReport(userId: string, reportId: string) {
+  const sql = await db();
+  const [r] = await sql`select 1 from reports where id = ${reportId} and user_id = ${userId} and status = 'signed'`;
+  return Boolean(r);
+}
+
+export async function recordMoveOut(
+  userId: string,
+  reportId: string,
+  input: { move_out_date?: string; entries: MoveOutEntry[] },
+): Promise<{ ok: boolean; updated: number; unknown: string[] }> {
+  if (!(await signedReport(userId, reportId))) return { ok: false, updated: 0, unknown: [] };
+  const sql = await db();
+  let updated = 0;
+  const unknown: string[] = [];
+  for (const e of input.entries) {
+    if (!isCondition(e.condition)) { unknown.push(e.item_id); continue; }
+    const res = await sql`
+      update items i set move_out_condition = ${e.condition},
+        move_out_notes = coalesce(${e.notes ?? null}, i.move_out_notes),
+        deduction_cents = coalesce(${e.deduction_cents ?? null}::int, i.deduction_cents)
+      from rooms ro where i.id = ${e.item_id} and ro.id = i.room_id and ro.report_id = ${reportId}`;
+    if (res.count) updated++; else unknown.push(e.item_id);
+  }
+  await sql`update reports set move_out_date = coalesce(${input.move_out_date ?? null}::date, move_out_date, current_date),
+              updated_at = now() where id = ${reportId}`;
+  return { ok: true, updated, unknown };
+}
+
+export async function updateMoveOutItem(
+  userId: string,
+  reportId: string,
+  itemId: string,
+  patch: { condition?: Condition | null; notes?: string; deduction_cents?: number },
+) {
+  if (!(await signedReport(userId, reportId))) return false;
+  const sql = await db();
+  const clean: Record<string, unknown> = {};
+  if (patch.condition !== undefined) clean.move_out_condition = patch.condition && isCondition(patch.condition) ? patch.condition : null;
+  if (patch.notes !== undefined) clean.move_out_notes = patch.notes;
+  if (patch.deduction_cents !== undefined) clean.deduction_cents = Math.max(0, Math.round(patch.deduction_cents));
+  if (!Object.keys(clean).length) return true;
+  const res = await sql`
+    update items i set ${sql(clean as Record<string, string>, Object.keys(clean))}
+    from rooms ro where i.id = ${itemId} and ro.id = i.room_id and ro.report_id = ${reportId}`;
+  if (res.count) await sql`update reports set move_out_date = coalesce(move_out_date, current_date), updated_at = now() where id = ${reportId}`;
+  return res.count > 0;
+}
+
+export async function setBond(userId: string, reportId: string, bondCents: number) {
+  const sql = await db();
+  await sql`update reports set bond_cents = ${Math.max(0, Math.round(bondCents))}, updated_at = now()
+            where id = ${reportId} and user_id = ${userId}`;
 }
