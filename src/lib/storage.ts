@@ -16,7 +16,8 @@ function s3() {
   client ??= new S3Client({
     region: process.env.AWS_REGION || "auto",
     endpoint: process.env.AWS_ENDPOINT_URL_S3 || undefined,
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
+    // Path-style URLs: custom S3 endpoints often have wildcard certs that do not cover bucket subdomains.
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE ? process.env.S3_FORCE_PATH_STYLE === "true" : Boolean(process.env.AWS_ENDPOINT_URL_S3),
   });
   return client;
 }
